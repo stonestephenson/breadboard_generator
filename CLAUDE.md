@@ -6,7 +6,19 @@ Generates synthetic training images of breadboard circuits for a CV model that c
 
 ## Reference Photo
 
-`reference/wb102_photo.jpeg` — A real photo of the WB-102 with components on it. Use for visual comparison only — do NOT extract measurements from this image. All dimensions come from `config/board_spec.json`. The photo shows the actual board color, hole appearance, rail stripe style, label printing, and how components physically sit on the board.
+`reference/wb102_photo.jpg` — A real photo of the WB-102 with components on it. Use for visual comparison only — do NOT extract measurements from this image. All dimensions come from `config/board_spec.json`.
+
+**Key visual details confirmed from the reference photo:**
+- Board body is **bright white** plastic, not off-white or cream
+- Row labels are **lowercase** (`a b c d e`, `f g h i j`), printed at **both ends** of the board
+- Row labels are printed **between the power rails and the terminal area**, not on the edge
+- Column numbers are printed along the edge near the power rails
+- Power rail stripes are **thin continuous red and blue lines** running the full board length
+- Red `+` and blue `-` symbols are printed at the rail ends (red outside, blue inside)
+- Power rails have a visible **gap/split near the center** of the board
+- The center gap (DIP channel) is a **narrow recessed channel** — not a wide painted bar
+- Holes appear as small dark squares with slightly rounded corners
+- The board in the photo is shown in portrait orientation, but labels confirm landscape is canonical
 
 ## Read First
 
@@ -122,3 +134,10 @@ python -c "from generator.board import render_blank_board; render_blank_board('c
 # Generate full dataset (Phase 6)
 python generate.py --circuit config/circuits/simple_led.json --n-correct 1000 --n-incorrect 4000 --seed 42 --output output/dataset_v1/
 ```
+
+## Git Discipline
+
+- Run `git add -A && git commit` after EVERY change that passes tests.
+- Use descriptive commit messages (e.g., "Fix rail hole vertical alignment").
+- NEVER make multiple unrelated changes between commits.
+- Before making any risky change, commit the current working state first.
