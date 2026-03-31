@@ -190,21 +190,20 @@ def _draw_labels(draw: ImageDraw.ImageDraw, grid: BreadboardGrid) -> None:
         _paste_rotated_text(img, r, font, row_label_color, x_right, y, -90)  # flipped 180 from before
 
     # Column number labels — between board edge and outermost rail
-    col_labels = [1] + list(range(5, grid.n_cols, 5))
-    if grid.n_cols not in col_labels:
-        col_labels.append(grid.n_cols)
-
-    # Top labels: between top edge and p1+ rail
-    y_top = grid.rail_y('p1+') / 2
-    # Bottom labels: between p2+ rail and bottom edge
-    _, board_h = grid.board_size()
-    y_bottom = (grid.rail_y('p2+') + board_h) / 2
-
-    col_font = _get_font(font_size * 0.85)
-    for c in col_labels:
-        x = grid.col_x(c)
-        draw.text((x, y_top), str(c), fill=label_color, font=col_font, anchor='mm')
-        draw.text((x, y_bottom), str(c), fill=label_color, font=col_font, anchor='mm')
+    # Disabled for now; kept for future re-enable
+    # col_labels = [1] + list(range(5, grid.n_cols, 5))
+    # if grid.n_cols not in col_labels:
+    #     col_labels.append(grid.n_cols)
+    #
+    # y_top = grid.rail_y('p1+') / 2
+    # _, board_h = grid.board_size()
+    # y_bottom = (grid.rail_y('p2+') + board_h) / 2
+    #
+    # col_font = _get_font(font_size * 0.85)
+    # for c in col_labels:
+    #     x = grid.col_x(c)
+    #     draw.text((x, y_top), str(c), fill=label_color, font=col_font, anchor='mm')
+    #     draw.text((x, y_bottom), str(c), fill=label_color, font=col_font, anchor='mm')
 
 
 def _paste_rotated_text(
