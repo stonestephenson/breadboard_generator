@@ -1,0 +1,26 @@
+{
+  "name": "resistor_voltage_divider",
+  "description": "Two resistors in series forming a voltage divider between power rails",
+  "components": [
+    {
+      "id": "R1",
+      "type": "resistor",
+      "value": "1k",
+      "pins": { "leg1": ["a", 20], "leg2": ["a", 25] },
+      "bands": [[139, 69, 19], [30, 30, 30], [200, 40, 40], [212, 175, 55]]
+    },
+    {
+      "id": "R2",
+      "type": "resistor",
+      "value": "2.2k",
+      "pins": { "leg1": ["a", 30], "leg2": ["a", 35] },
+      "bands": [[200, 40, 40], [200, 40, 40], [200, 40, 40], [212, 175, 55]]
+    }
+  ],
+  "wires": [
+    { "from": ["p1+", 19], "to": ["a", 20], "color": "red", "routing": "L" },
+    { "from": ["a", 25], "to": ["a", 30], "color": "orange" },
+    { "from": ["a", 35], "to": ["p1-", 37], "color": "black", "routing": "L" },
+    { "from": ["e", 28], "to": ["f", 28], "color": "green", "routing": "straight" }
+  ]
+}
