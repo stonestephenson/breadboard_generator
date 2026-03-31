@@ -1,0 +1,24 @@
+{
+  "name": "simple_led_circuit",
+  "description": "Red LED with 220-ohm current-limiting resistor powered from top rail",
+  "components": [
+    {
+      "id": "R1",
+      "type": "resistor",
+      "value": "220",
+      "pins": { "leg1": ["a", 10], "leg2": ["a", 15] },
+      "bands": [[200, 40, 40], [200, 40, 40], [139, 69, 19], [212, 175, 55]]
+    },
+    {
+      "id": "LED1",
+      "type": "led",
+      "color": "red",
+      "pins": { "anode": ["a", 20], "cathode": ["b", 20] }
+    }
+  ],
+  "wires": [
+    { "from": ["p1+", 9], "to": ["a", 10], "color": "red", "routing": "L" },
+    { "from": ["a", 15], "to": ["a", 20], "color": "yellow" },
+    { "from": ["b", 20], "to": ["p1-", 21], "color": "black", "routing": "L" }
+  ]
+}
