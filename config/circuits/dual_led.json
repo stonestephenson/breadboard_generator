@@ -1,0 +1,32 @@
+{
+  "name": "dual_led_circuit",
+  "description": "Two LEDs (red and green) with a shared current-limiting resistor, using both board halves",
+  "components": [
+    {
+      "id": "R1",
+      "type": "resistor",
+      "value": "330",
+      "pins": { "leg1": ["a", 15], "leg2": ["a", 20] },
+      "bands": [[220, 130, 40], [220, 130, 40], [139, 69, 19], [212, 175, 55]]
+    },
+    {
+      "id": "LED1",
+      "type": "led",
+      "color": "red",
+      "pins": { "anode": ["d", 25], "cathode": ["e", 25] }
+    },
+    {
+      "id": "LED2",
+      "type": "led",
+      "color": "green",
+      "pins": { "anode": ["d", 35], "cathode": ["e", 35] }
+    }
+  ],
+  "wires": [
+    { "from": ["p1+", 13], "to": ["a", 15], "color": "red", "routing": "L" },
+    { "from": ["a", 20], "to": ["a", 25], "color": "yellow" },
+    { "from": ["a", 20], "to": ["a", 35], "color": "orange" },
+    { "from": ["f", 25], "to": ["p2-", 25], "color": "black", "routing": "L" },
+    { "from": ["f", 35], "to": ["p2-", 37], "color": "blue", "routing": "L" }
+  ]
+}
