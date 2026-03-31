@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+output/images/
+output/dataset_*/
+*.egg-info/
+.DS_Store

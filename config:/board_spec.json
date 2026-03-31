@@ -1,0 +1,107 @@
+{
+  "_model": "WB-102 Solderless Breadboard by Circuit Specialists",
+  "_notes": [
+    "All measurements sourced from manufacturer specs and BB830/MB-102 datasheets.",
+    "The WB-102 is functionally identical to the industry-standard 830-point breadboard (BB830/MB-102).",
+    "Dimensions: 6.5 x 2.125 x 0.3 inches (165.1 x 54.0 x 8.5 mm).",
+    "830 total tie-points: 630 terminal + 200 power rail (4 rails x 50 holes each).",
+    "Power rails are split into two 25-hole segments per rail with a gap in the middle.",
+    "Wire insertion size: 20-29 AWG (0.4 to 0.7mm diameter).",
+    "ABS plastic body, white/off-white with color-printed legend.",
+    "Phosphor bronze contacts with plated nickel finish."
+  ],
+
+  "board": {
+    "real_width_mm": 165.1,
+    "real_height_mm": 54.0,
+    "real_depth_mm": 8.5,
+    "pixels_per_mm": 4.0,
+    "body_color": [230, 230, 220],
+    "border_radius_px": 4,
+    "edge_padding_left_mm": 3.5,
+    "edge_padding_right_mm": 3.5,
+    "edge_padding_top_mm": 3.0,
+    "edge_padding_bottom_mm": 3.0,
+    "orientation": "landscape"
+  },
+
+  "holes": {
+    "pitch_mm": 2.54,
+    "diameter_mm": 1.0,
+    "color": [35, 35, 35],
+    "shadow_color": [20, 20, 20],
+    "shape": "square_rounded",
+    "_shape_note": "WB-102 holes are slightly square with rounded corners, not perfectly circular"
+  },
+
+  "terminal_strip": {
+    "rows_per_half": 5,
+    "total_rows": 10,
+    "columns": 63,
+    "center_gap_mm": 7.62,
+    "_center_gap_note": "0.3 inches — sized for standard DIP IC packages spanning the gap",
+    "row_labels_top": ["A", "B", "C", "D", "E"],
+    "row_labels_bottom": ["F", "G", "H", "I", "J"],
+    "column_labels_every_n": 5,
+    "_column_labels_note": "Column numbers printed every 5 columns: 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, plus 63",
+    "label_color": [100, 100, 100],
+    "label_font_size_mm": 1.5,
+    "connectivity": "column_half",
+    "_connectivity_note": "Each column of 5 holes in the same half (A-E or F-J) is electrically connected"
+  },
+
+  "power_rails": {
+    "count": 4,
+    "_layout_note": [
+      "2 rails on top (positive + negative), 2 rails on bottom (positive + negative).",
+      "Each rail has 50 holes split into two 25-hole segments with a gap near column 32.",
+      "Red stripe marks positive rail (+), blue/black stripe marks negative rail (-).",
+      "The WB-102 uses red and blue stripes."
+    ],
+    "holes_per_segment": 25,
+    "segments_per_rail": 2,
+    "segment_gap_cols": 1,
+    "positive_stripe_color": [200, 40, 40],
+    "negative_stripe_color": [40, 80, 200],
+    "stripe_width_mm": 0.8,
+    "offset_from_terminal_mm": 4.0,
+    "_offset_note": "Distance from the outermost terminal row to the nearest power rail row",
+    "rail_row_spacing_mm": 2.54,
+    "_rail_row_spacing_note": "The two rail rows (+ and -) on each side are spaced at standard pitch",
+    "rail_order_top": ["positive", "negative"],
+    "rail_order_bottom": ["positive", "negative"],
+    "_rail_order_note": "On WB-102: red (+) on outside, blue (-) on inside for both top and bottom"
+  },
+
+  "rendering": {
+    "antialias": true,
+    "supersample_factor": 2,
+    "_supersample_note": "Render at 2x then downscale for cleaner antialiasing",
+    "background_color": [180, 180, 180],
+    "_background_note": "Neutral grey background simulating a desk/table surface"
+  },
+
+  "component_defaults": {
+    "wire_thickness_mm": 0.6,
+    "wire_colors": {
+      "red":    [200, 40, 40],
+      "black":  [30, 30, 30],
+      "yellow": [220, 200, 40],
+      "green":  [40, 160, 40],
+      "blue":   [40, 80, 200],
+      "white":  [235, 235, 235],
+      "orange": [220, 130, 40]
+    },
+    "resistor_body_length_mm": 6.0,
+    "resistor_body_width_mm": 2.2,
+    "resistor_lead_diameter_mm": 0.5,
+    "led_dome_diameter_mm": 3.0,
+    "led_colors": {
+      "red":    [255, 30, 30],
+      "green":  [30, 220, 30],
+      "yellow": [255, 220, 30],
+      "blue":   [30, 80, 255],
+      "white":  [255, 255, 240]
+    }
+  }
+}
