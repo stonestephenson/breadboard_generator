@@ -175,11 +175,11 @@ class TestRailLayout:
                 gap = groups[i + 1][0] - groups[i][-1] - 1
                 assert gap == ig, f"Gap between group {i} and {i+1} is {gap}, expected {ig}"
 
-    def test_rails_span_terminal_area(self, grid):
-        """Rail groups should start at col 1 and end at col 63."""
+    def test_rails_start_at_configured_column(self, grid, spec):
+        """Rail groups should start at the configured rail_start_col."""
         groups = grid.rail_groups()
-        assert groups[0][0] == 1
-        assert groups[-1][-1] == grid.n_cols
+        expected_start = spec['power_rails'].get('rail_start_col', 1)
+        assert groups[0][0] == expected_start
 
     def test_top_rail_spacing(self, grid, spec):
         expected = spec['power_rails']['rail_row_spacing_mm'] * spec['board']['pixels_per_mm']

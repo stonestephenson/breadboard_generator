@@ -50,6 +50,7 @@ class BreadboardGrid:
         self.groups_per_segment = spec['power_rails']['groups_per_segment']
         self.inter_group_gap = spec['power_rails']['inter_group_gap_cols']
         self.center_gap_cols = spec['power_rails']['center_gap_cols']
+        self.rail_start_col = spec['power_rails'].get('rail_start_col', 1)
         self.holes_per_segment = self.holes_per_group * self.groups_per_segment
 
         self._compute_positions()
@@ -110,7 +111,7 @@ class BreadboardGrid:
           Segment 1: 5 groups of 5 holes with 1-col gaps between groups
           Center gap: 5 columns
           Segment 2: 5 groups of 5 holes with 1-col gaps between groups
-        Rail holes align with terminal columns starting at column 1.
+        Rail holes align with terminal columns starting at rail_start_col.
         """
         gpg = self.holes_per_group        # 5
         gps = self.groups_per_segment     # 5
@@ -122,8 +123,8 @@ class BreadboardGrid:
         self._rail_seg1_cols: list[int] = []
         self._rail_seg2_cols: list[int] = []
 
-        # Segment 1 starts at terminal column 1
-        col = 1
+        # Segment 1 starts at the configured rail start column
+        col = self.rail_start_col
         for _ in range(gps):
             group = list(range(col, col + gpg))
             self._rail_groups.append(group)
@@ -141,6 +142,29 @@ class BreadboardGrid:
             self._rail_seg2_cols.extend(group)
             col += group_stride
 
+        # Extend column x-positions for any rail columns beyond terminal range
+        total_width = (self.n_cols - 1) * self.pitch_mm
+        x_start = (self.board_width_mm - total_width) / 2.0
+        for c in (self._rail_seg1_cols + self._rail_seg2_cols):
+            if c not in self._col_x_mm:
+                self._col_x_mm[c] = x_start + (c - 1) * self.pitch_mm
+
+        # Clip rail columns that fall outside the board boundary
+        half_hole = self.hole_diameter_mm / 2.0
+        self._rail_seg1_cols = [
+            c for c in self._rail_seg1_cols
+            if half_hole <= self._col_x_mm[c] <= self.board_width_mm - half_hole
+        ]
+        self._rail_seg2_cols = [
+            c for c in self._rail_seg2_cols
+            if half_hole <= self._col_x_mm[c] <= self.board_width_mm - half_hole
+        ]
+        self._rail_groups = [
+            [c for c in g
+             if half_hole <= self._col_x_mm[c] <= self.board_width_mm - half_hole]
+            for g in self._rail_groups
+        ]
+        self._rail_groups = [g for g in self._rail_groups if g]
         self._rail_all_cols = self._rail_seg1_cols + self._rail_seg2_cols
 
     # ── Public API ────────────────────────────────────────────────────

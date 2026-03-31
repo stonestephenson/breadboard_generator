@@ -146,10 +146,27 @@ class BoardValidator:
         return errors
 
     def _check_rail_grouping(self, arr: np.ndarray) -> list[str]:
-        """Check that gaps between rail groups are clear (no holes in gap columns)."""
+        """Check that gaps between rail groups are clear and rail start column is correct."""
         errors = []
         grid = self.grid
         groups = grid.rail_groups()
+
+        # Verify rail groups start at the configured column
+        expected_start = self.spec['power_rails'].get('rail_start_col', 1)
+        if groups[0][0] != expected_start:
+            errors.append(
+                f"Rail groups start at col {groups[0][0]}, "
+                f"expected col {expected_start}"
+            )
+
+        # Verify first rail group x-position aligns with terminal column
+        rail_x = grid.col_x(groups[0][0])
+        terminal_x = grid.col_x(expected_start)
+        if abs(rail_x - terminal_x) > 0.01:
+            errors.append(
+                f"Rail start x ({rail_x:.1f}) does not align with "
+                f"terminal col {expected_start} x ({terminal_x:.1f})"
+            )
 
         # Check inter-group gap pixels are light (no holes)
         dark_threshold = 80
@@ -160,8 +177,6 @@ class BoardValidator:
             gap_col_start = groups[i][-1] + 1
             gap_col_end = groups[i + 1][0]
             for gc in range(gap_col_start, gap_col_end):
-                if gc < 1 or gc > grid.n_cols:
-                    continue
                 x = grid.col_x(gc)
                 y = grid.rail_y('p1+')
                 px, py = int(round(x)), int(round(y))
