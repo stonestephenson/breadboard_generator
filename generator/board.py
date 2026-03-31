@@ -91,8 +91,8 @@ def _draw_rail_stripes(draw: ImageDraw.ImageDraw, grid: BreadboardGrid) -> None:
     neg_color = tuple(spec['power_rails']['negative_stripe_color'])
 
     half_pitch = grid.pitch_px / 2
-    stripe_x_start = grid.col_x(2) - half_pitch
-    stripe_x_end = grid.col_x(62) + half_pitch
+    stripe_x_start = (grid.col_x(2) + grid.col_x(3)) / 2 - half_pitch
+    stripe_x_end = (grid.col_x(61) + grid.col_x(62)) / 2 + half_pitch
 
     # Top rail block: p1+ (outer row) and p1- (inner row)
     y_p1_plus = grid.rail_y('p1+')
@@ -205,29 +205,47 @@ def _draw_labels(draw: ImageDraw.ImageDraw, grid: BreadboardGrid) -> None:
         draw.text((x, y_bottom), str(c), fill=label_color, font=col_font, anchor='mm')
 
 
+def _paste_rotated_text(
+    img: Image.Image, text: str, font: ImageFont.FreeTypeFont,
+    color: tuple[int, ...], cx: float, cy: float, angle: float,
+) -> None:
+    """Render text into a temporary image, rotate, and paste centered at (cx, cy)."""
+    # Measure text size
+    bbox = font.getbbox(text)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    pad = 4
+    tmp = Image.new('RGBA', (tw + pad * 2, th + pad * 2), (0, 0, 0, 0))
+    tmp_draw = ImageDraw.Draw(tmp)
+    tmp_draw.text((pad - bbox[0], pad - bbox[1]), text, fill=color + (255,), font=font)
+    tmp = tmp.rotate(angle, expand=True, resample=Image.BICUBIC)
+    px = int(round(cx - tmp.width / 2))
+    py = int(round(cy - tmp.height / 2))
+    img.paste(tmp, (px, py), tmp)
+
+
 def _draw_rail_symbols(draw: ImageDraw.ImageDraw, grid: BreadboardGrid) -> None:
-    """Draw red + and blue - symbols at both ends of each stripe line."""
+    """Draw red + and blue - symbols at both ends of each stripe line, rotated 90°."""
     spec = grid.spec
     pos_color = tuple(spec['power_rails']['positive_stripe_color'])
     neg_color = tuple(spec['power_rails']['negative_stripe_color'])
     font_size = spec['terminal_strip']['label_font_size_mm'] * grid.ppmm
-    font = _get_font(font_size * 1.1)
+    plus_font = _get_font(font_size * 3.52 * 0.8)   # +: 20% smaller
+    minus_font = _get_font(font_size * 3.52 * 1.2)   # -: 20% larger
 
-    w, _ = grid.board_size()
-    margin = grid.ppmm * 1.5
-    x_left = margin * 0.4
-    x_right = w - margin * 0.4
+    img = draw._image  # get the underlying image to paste rotated glyphs
+    x_left = grid.col_x(1)
+    x_right = grid.col_x(63)
 
     half_pitch = grid.pitch_px / 2
 
     # Must match stripe y-positions from _draw_rail_stripes
     symbols = [
-        (grid.rail_y('p1+') - half_pitch, '+', pos_color),
-        (grid.rail_y('p1-') + half_pitch, '-', neg_color),
-        (grid.rail_y('p2-') - half_pitch, '+', pos_color),
-        (grid.rail_y('p2+') + half_pitch, '-', neg_color),
+        (grid.rail_y('p1+') - half_pitch, '+', pos_color, plus_font),
+        (grid.rail_y('p1-') + half_pitch, '-', neg_color, minus_font),
+        (grid.rail_y('p2-') - half_pitch, '+', pos_color, plus_font),
+        (grid.rail_y('p2+') + half_pitch, '-', neg_color, minus_font),
     ]
 
-    for y, symbol, color in symbols:
-        draw.text((x_left, y), symbol, fill=color, font=font, anchor='mm')
-        draw.text((x_right, y), symbol, fill=color, font=font, anchor='mm')
+    for y, symbol, color, font in symbols:
+        for x in (x_left, x_right):
+            _paste_rotated_text(img, symbol, font, color, x, y, 90)
