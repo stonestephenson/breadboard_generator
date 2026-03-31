@@ -182,10 +182,12 @@ def _draw_labels(draw: ImageDraw.ImageDraw, grid: BreadboardGrid) -> None:
     board_w, _ = grid.board_size()
     x_right = (grid.col_x(grid.n_cols) + board_w) / 2
 
+    img = draw._image
+    row_label_color = (0, 0, 0)  # black
     for r in all_rows:
         y = grid.row_y(r)
-        draw.text((x_left, y), r, fill=label_color, font=font, anchor='mm')
-        draw.text((x_right, y), r, fill=label_color, font=font, anchor='mm')
+        _paste_rotated_text(img, r, font, row_label_color, x_left, y, -90)   # clockwise
+        _paste_rotated_text(img, r, font, row_label_color, x_right, y, -90)  # flipped 180 from before
 
     # Column number labels — between board edge and outermost rail
     col_labels = [1] + list(range(5, grid.n_cols, 5))
