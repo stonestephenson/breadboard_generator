@@ -90,10 +90,9 @@ def _draw_rail_stripes(draw: ImageDraw.ImageDraw, grid: BreadboardGrid) -> None:
     pos_color = tuple(spec['power_rails']['positive_stripe_color'])
     neg_color = tuple(spec['power_rails']['negative_stripe_color'])
 
-    w, _ = grid.board_size()
-    margin = grid.ppmm * 1.5
-
     half_pitch = grid.pitch_px / 2
+    stripe_x_start = grid.col_x(2) - half_pitch
+    stripe_x_end = grid.col_x(62) + half_pitch
 
     # Top rail block: p1+ (outer row) and p1- (inner row)
     y_p1_plus = grid.rail_y('p1+')
@@ -102,21 +101,22 @@ def _draw_rail_stripes(draw: ImageDraw.ImageDraw, grid: BreadboardGrid) -> None:
     top_blue_y = y_p1_minus + half_pitch    # blue below inner row
 
     # Bottom rail block: p2- (inner row) and p2+ (outer row)
+    # Flipped from top: red on inside, blue on outside
     y_p2_minus = grid.rail_y('p2-')
     y_p2_plus = grid.rail_y('p2+')
-    bottom_blue_y = y_p2_minus - half_pitch  # blue above inner row
-    bottom_red_y = y_p2_plus + half_pitch    # red below outer row
+    bottom_red_y = y_p2_minus - half_pitch   # red above inner row (inside)
+    bottom_blue_y = y_p2_plus + half_pitch   # blue below outer row (outside)
 
     stripes = [
         (top_red_y, pos_color),
         (top_blue_y, neg_color),
-        (bottom_blue_y, neg_color),
         (bottom_red_y, pos_color),
+        (bottom_blue_y, neg_color),
     ]
 
     for y, color in stripes:
         draw.rectangle(
-            [margin, y - stripe_h / 2, w - margin, y + stripe_h / 2],
+            [stripe_x_start, y - stripe_h / 2, stripe_x_end, y + stripe_h / 2],
             fill=color,
         )
 
@@ -224,8 +224,8 @@ def _draw_rail_symbols(draw: ImageDraw.ImageDraw, grid: BreadboardGrid) -> None:
     symbols = [
         (grid.rail_y('p1+') - half_pitch, '+', pos_color),
         (grid.rail_y('p1-') + half_pitch, '-', neg_color),
-        (grid.rail_y('p2-') - half_pitch, '-', neg_color),
-        (grid.rail_y('p2+') + half_pitch, '+', pos_color),
+        (grid.rail_y('p2-') - half_pitch, '+', pos_color),
+        (grid.rail_y('p2+') + half_pitch, '-', neg_color),
     ]
 
     for y, symbol, color in symbols:

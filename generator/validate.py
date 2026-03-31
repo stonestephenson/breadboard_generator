@@ -122,8 +122,8 @@ class BoardValidator:
         checks = [
             (grid.rail_y('p1+') - half_pitch, 'top_red', 0),
             (grid.rail_y('p1-') + half_pitch, 'top_blue', 2),
-            (grid.rail_y('p2-') - half_pitch, 'bottom_blue', 2),
-            (grid.rail_y('p2+') + half_pitch, 'bottom_red', 0),
+            (grid.rail_y('p2-') - half_pitch, 'bottom_red', 0),
+            (grid.rail_y('p2+') + half_pitch, 'bottom_blue', 2),
         ]
 
         for stripe_y, label, dominant_channel in checks:
