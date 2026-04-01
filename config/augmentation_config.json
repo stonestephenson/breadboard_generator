@@ -1,0 +1,51 @@
+{
+  "_description": "Parameter ranges for the augmentation pipeline. Each augmentation can be enabled/disabled and has tunable ranges.",
+
+  "perspective_warp": {
+    "enabled": true,
+    "max_angle_deg": 15
+  },
+
+  "lighting_jitter": {
+    "enabled": true,
+    "brightness_range": [-30, 30],
+    "contrast_range": [0.8, 1.2]
+  },
+
+  "gaussian_blur": {
+    "enabled": true,
+    "kernel_range": [1, 5]
+  },
+
+  "rotation": {
+    "enabled": true,
+    "max_angle_deg": 5
+  },
+
+  "add_shadow": {
+    "enabled": true,
+    "shadow_intensity_range": [0.3, 0.7]
+  },
+
+  "add_noise": {
+    "enabled": true,
+    "noise_std_range": [5, 20]
+  },
+
+  "background_variation": {
+    "enabled": true,
+    "bg_colors": [
+      [180, 180, 180],
+      [200, 190, 170],
+      [160, 170, 180],
+      [220, 220, 210],
+      [140, 140, 150],
+      [190, 180, 160],
+      [170, 180, 170]
+    ]
+  },
+
+  "apply_random": {
+    "n_augmentations": [2, 4]
+  }
+}
