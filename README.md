@@ -393,6 +393,4 @@ elif ctype == 'capacitor':
 { "id": "C1", "type": "capacitor", "value": "100nF", "pins": { "pin1": ["a", 30], "pin2": ["b", 30] } }
 ```
 
-## License
-
-TBD
+That's all for now... 
