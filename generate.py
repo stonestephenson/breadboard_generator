@@ -20,7 +20,15 @@ from generator.grid import BreadboardGrid, load_spec
 from generator.circuit import load_circuit, render_circuit
 from generator.mutations import MutationEngine
 from generator.augment import AugmentationPipeline, load_augmentation_config
-from generator.validate import BoardValidator
+from generator.validate import BoardValidator, validate_annotations
+from generator.annotations import (
+    BoundingBoxGenerator,
+    transform_annotations,
+    coco_dataset,
+)
+
+
+ANNOTATION_FORMATS = ('none', 'coco', 'yolo', 'both')
 
 
 def _render_and_downscale(
@@ -40,6 +48,33 @@ def _render_and_downscale(
     return img
 
 
+def _emit_annotations(
+    anns: list,
+    stem: str,
+    image_size: tuple,
+    image_id: int,
+    bbox_gen: 'BoundingBoxGenerator',
+    write_yolo: bool,
+    write_coco: bool,
+    yolo_dir: str | None,
+    coco_records: list,
+) -> None:
+    """Write per-image YOLO label file and/or accumulate a COCO record."""
+    if write_yolo and yolo_dir is not None:
+        yolo_text = bbox_gen.to_yolo(anns, image_size)
+        yolo_path = os.path.join(yolo_dir, f"{stem}.txt")
+        with open(yolo_path, 'w') as f:
+            f.write(yolo_text)
+            if yolo_text:
+                f.write('\n')
+
+    if write_coco:
+        record = bbox_gen.to_coco(anns, image_id=image_id, image_size=image_size)
+        # Tag the image entry with its filename for downstream tooling.
+        record['image']['file_name'] = f"{stem}.png"
+        coco_records.append(record)
+
+
 def generate_dataset(
     circuit_config_path: str,
     board_spec_path: str,
@@ -49,6 +84,7 @@ def generate_dataset(
     n_incorrect: int = 4000,
     seed: int = 42,
     validate: bool = True,
+    annotation_format: str = 'both',
 ) -> dict:
     """
     Generate a full labeled dataset.
@@ -62,10 +98,20 @@ def generate_dataset(
         n_incorrect: Number of incorrect images to generate.
         seed: Master random seed.
         validate: Whether to run validation on generated images.
+        annotation_format: One of 'none', 'coco', 'yolo', 'both'. Controls
+            export of bounding box annotations. 'coco' writes a single
+            annotations.json; 'yolo' writes per-image labels/<name>.txt;
+            'both' writes both. 'none' disables annotation export.
 
     Returns:
         Summary dict with counts and any validation warnings.
     """
+    if annotation_format not in ANNOTATION_FORMATS:
+        raise ValueError(
+            f"annotation_format must be one of {ANNOTATION_FORMATS}, "
+            f"got {annotation_format!r}"
+        )
+
     start_time = time.time()
 
     # Load configs
@@ -77,12 +123,21 @@ def generate_dataset(
     images_dir = os.path.join(output_dir, 'images')
     os.makedirs(images_dir, exist_ok=True)
 
+    write_yolo = annotation_format in ('yolo', 'both')
+    write_coco = annotation_format in ('coco', 'both')
+    if write_yolo:
+        labels_yolo_dir = os.path.join(output_dir, 'labels')
+        os.makedirs(labels_yolo_dir, exist_ok=True)
+
     # Setup validation
     grid = BreadboardGrid(spec)
     validator = BoardValidator(spec, grid) if validate else None
+    bbox_gen = BoundingBoxGenerator(grid, spec)
+    image_size = (grid.board_width_px, grid.board_height_px)
 
     labels = []
     validation_warnings = []
+    coco_records: list[dict] = []
 
     # --- Generate correct images ---
     for i in range(n_correct):
@@ -91,10 +146,19 @@ def generate_dataset(
 
         img = _render_and_downscale(circuit_config, spec)
 
-        # Augment
+        # Compute bboxes from the source circuit before augmentation distorts them.
+        pre_aug_anns = bbox_gen.generate_annotations(circuit_config)
+
+        # Augment (records geometric transforms for bbox propagation).
         aug_img, aug_record = aug_pipeline.apply_random_pil(img)
 
+        # Propagate bboxes through any geometric augmentations.
+        final_anns = transform_annotations(
+            pre_aug_anns, aug_record.get('geom_transforms', []), image_size,
+        )
+
         filename = f"correct_{i:04d}.png"
+        stem = os.path.splitext(filename)[0]
         aug_img.save(os.path.join(images_dir, filename))
 
         labels.append({
@@ -113,6 +177,25 @@ def generate_dataset(
             if errors:
                 for e in errors:
                     validation_warnings.append(f"{filename}: {e}")
+
+            ann_errors = validate_annotations(
+                pre_aug_anns, circuit_config, image_size, grid=grid,
+            )
+            for e in ann_errors:
+                validation_warnings.append(f"{filename} (annotations): {e}")
+
+        # Emit annotations in the requested format(s).
+        _emit_annotations(
+            anns=final_anns,
+            stem=stem,
+            image_size=image_size,
+            image_id=i,
+            bbox_gen=bbox_gen,
+            write_yolo=write_yolo,
+            write_coco=write_coco,
+            yolo_dir=labels_yolo_dir if write_yolo else None,
+            coco_records=coco_records,
+        )
 
     # --- Generate incorrect images ---
     mutation_types = [
@@ -141,10 +224,18 @@ def generate_dataset(
 
         img = _render_and_downscale(mutated_config, spec)
 
-        # Augment
+        # Compute bboxes from the mutated circuit (matches what was rendered).
+        pre_aug_anns = bbox_gen.generate_annotations(mutated_config)
+
+        # Augment (records geometric transforms for bbox propagation).
         aug_img, aug_record = aug_pipeline.apply_random_pil(img)
 
+        final_anns = transform_annotations(
+            pre_aug_anns, aug_record.get('geom_transforms', []), image_size,
+        )
+
         filename = f"incorrect_{i:04d}.png"
+        stem = os.path.splitext(filename)[0]
         aug_img.save(os.path.join(images_dir, filename))
 
         labels.append({
@@ -157,10 +248,43 @@ def generate_dataset(
             "seed": seed,
         })
 
+        if validator:
+            ann_errors = validate_annotations(
+                pre_aug_anns, mutated_config, image_size, grid=grid,
+            )
+            for e in ann_errors:
+                validation_warnings.append(f"{filename} (annotations): {e}")
+
+        # Image_id offset by n_correct so correct/incorrect ids don't collide.
+        _emit_annotations(
+            anns=final_anns,
+            stem=stem,
+            image_size=image_size,
+            image_id=n_correct + i,
+            bbox_gen=bbox_gen,
+            write_yolo=write_yolo,
+            write_coco=write_coco,
+            yolo_dir=labels_yolo_dir if write_yolo else None,
+            coco_records=coco_records,
+        )
+
     # --- Save labels ---
     labels_path = os.path.join(output_dir, 'labels.json')
     with open(labels_path, 'w') as f:
         json.dump(labels, f, indent=2)
+
+    # --- Save COCO annotations.json ---
+    if write_coco and coco_records:
+        coco = coco_dataset(
+            coco_records,
+            description=(
+                f"Synthetic breadboard dataset from "
+                f"{os.path.basename(circuit_config_path)} (seed={seed})"
+            ),
+        )
+        coco_path = os.path.join(output_dir, 'annotations.json')
+        with open(coco_path, 'w') as f:
+            json.dump(coco, f, indent=2)
 
     # --- Save metadata ---
     elapsed = time.time() - start_time
@@ -173,6 +297,7 @@ def generate_dataset(
         "n_incorrect": n_incorrect,
         "total_images": n_correct + n_incorrect,
         "seed": seed,
+        "annotation_format": annotation_format,
         "elapsed_seconds": round(elapsed, 2),
     }
     metadata_path = os.path.join(output_dir, 'metadata.json')
@@ -238,6 +363,15 @@ def main():
         '--no-validate', action='store_true',
         help='Skip validation checks',
     )
+    parser.add_argument(
+        '--annotation-format', choices=ANNOTATION_FORMATS, default='both',
+        help=(
+            'Bounding box annotation export format: '
+            "'coco' writes annotations.json; "
+            "'yolo' writes per-image labels/<name>.txt; "
+            "'both' writes both; 'none' disables annotation export."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -250,6 +384,7 @@ def main():
         n_incorrect=args.n_incorrect,
         seed=args.seed,
         validate=not args.no_validate,
+        annotation_format=args.annotation_format,
     )
 
     print(f"\nDataset generation complete!")
@@ -257,6 +392,7 @@ def main():
     print(f"  Incorrect images:     {summary['n_incorrect']}")
     print(f"  Total:                {summary['total']}")
     print(f"  Validation warnings:  {summary['validation_warnings']}")
+    print(f"  Annotation format:    {args.annotation_format}")
     print(f"  Time:                 {summary['elapsed_seconds']}s")
     print(f"  Output:               {summary['output_dir']}")
 

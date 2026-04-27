@@ -32,6 +32,9 @@ class AugmentationPipeline:
         self.seed = seed
         self.rng = random.Random(seed)
         self.np_rng = np.random.RandomState(seed)
+        # Geometric transform matrices recorded for bbox propagation.
+        # Reset at the start of every apply_random call.
+        self._geom_transforms: list[dict] = []
 
     def _to_cv(self, img: Image.Image | np.ndarray) -> np.ndarray:
         """Convert PIL Image to OpenCV BGR numpy array."""
@@ -75,6 +78,10 @@ class AugmentationPipeline:
         ])
 
         M = cv2.getPerspectiveTransform(src, dst)
+        self._geom_transforms.append({
+            "type": "perspective",
+            "matrix": M.tolist(),
+        })
         result = cv2.warpPerspective(arr, M, (w, h), borderMode=cv2.BORDER_REPLICATE)
         return result
 
@@ -126,6 +133,10 @@ class AugmentationPipeline:
         angle = self.rng.uniform(-max_angle_deg, max_angle_deg)
         center = (w / 2, h / 2)
         M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        self._geom_transforms.append({
+            "type": "affine",
+            "matrix": M.tolist(),
+        })
         return cv2.warpAffine(arr, M, (w, h), borderMode=cv2.BORDER_REPLICATE)
 
     def add_shadow(
@@ -223,6 +234,9 @@ class AugmentationPipeline:
         if n_augmentations is None:
             n_augmentations = tuple(self.config['apply_random']['n_augmentations'])
 
+        # Reset geometric transform log for this run.
+        self._geom_transforms = []
+
         available = []
         aug_methods = {
             'perspective_warp': self.perspective_warp,
@@ -253,6 +267,7 @@ class AugmentationPipeline:
             "augmentations": applied,
             "n_applied": len(applied),
             "seed": self.seed,
+            "geom_transforms": list(self._geom_transforms),
         }
         return arr, record
 
