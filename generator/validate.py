@@ -258,3 +258,100 @@ def validate_blank_board(spec: dict, img: Image.Image) -> list[str]:
     grid = BreadboardGrid(spec)
     validator = BoardValidator(spec, grid)
     return validator.validate_board(img)
+
+
+def validate_annotations(
+    annotations: list[dict],
+    circuit_config: dict,
+    image_size: tuple[int, int],
+    grid: BreadboardGrid | None = None,
+    tolerance_px: float = 4.0,
+) -> list[str]:
+    """
+    Validate a list of bounding box annotations against a circuit config.
+
+    Checks:
+    - Every component in the circuit config has a corresponding bounding box
+    - Every wire in the circuit config has a corresponding bounding box
+    - No bounding box extends outside image bounds
+    - No bounding box has zero or negative area
+    - Component bboxes contain the expected pin pixel coordinates
+      (within tolerance — accounts for clamping/rounding)
+
+    Args:
+        annotations: List of annotation dicts from BoundingBoxGenerator.
+        circuit_config: Source circuit config dict.
+        image_size: (width, height) of the rendered image.
+        grid: BreadboardGrid for pin lookups; required for the position check.
+        tolerance_px: Max allowed deviation when verifying pin coverage.
+
+    Returns:
+        List of error strings (empty list = pass).
+    """
+    errors: list[str] = []
+    img_w, img_h = image_size
+
+    # Build lookup of component-id → annotation
+    comp_anns = {
+        a.get("component_id"): a
+        for a in annotations
+        if "component_id" in a and a.get("component_id") is not None
+    }
+    wire_anns = {
+        a.get("wire_index"): a
+        for a in annotations
+        if "wire_index" in a
+    }
+
+    # Every component must be annotated
+    for comp in circuit_config.get("components", []):
+        cid = comp.get("id")
+        if cid is None:
+            continue
+        if cid not in comp_anns:
+            errors.append(f"Component {cid!r} has no bounding box annotation")
+
+    # Every wire must be annotated
+    for i in range(len(circuit_config.get("wires", []))):
+        if i not in wire_anns:
+            errors.append(f"Wire index {i} has no bounding box annotation")
+
+    # Bbox geometry checks
+    for a in annotations:
+        x1, y1, x2, y2 = a["bbox"]
+        label = a.get("component_id") or f"wire#{a.get('wire_index')}" or a["class_name"]
+
+        if x2 <= x1 or y2 <= y1:
+            errors.append(
+                f"{label}: bbox has zero or negative area: ({x1},{y1},{x2},{y2})"
+            )
+            continue
+        if x1 < 0 or y1 < 0 or x2 > img_w or y2 > img_h:
+            errors.append(
+                f"{label}: bbox ({x1},{y1},{x2},{y2}) extends outside image "
+                f"bounds (0,0,{img_w},{img_h})"
+            )
+
+    # Pin-coverage check: each component's bbox should contain its pin centers
+    if grid is not None:
+        for comp in circuit_config.get("components", []):
+            cid = comp.get("id")
+            ann = comp_anns.get(cid)
+            if ann is None:
+                continue
+            x1, y1, x2, y2 = ann["bbox"]
+            for pin_name, pin_val in comp.get("pins", {}).items():
+                if not (isinstance(pin_val, (list, tuple)) and len(pin_val) == 2):
+                    continue
+                px, py = grid.hole_center(pin_val[0], pin_val[1])
+                if not (
+                    x1 - tolerance_px <= px <= x2 + tolerance_px
+                    and y1 - tolerance_px <= py <= y2 + tolerance_px
+                ):
+                    errors.append(
+                        f"{cid}: pin {pin_name} center ({px:.1f},{py:.1f}) "
+                        f"outside bbox ({x1},{y1},{x2},{y2}) "
+                        f"with {tolerance_px}px tolerance"
+                    )
+
+    return errors

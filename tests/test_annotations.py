@@ -17,6 +17,7 @@ from generator.annotations import (
     transform_annotations,
     coco_dataset,
 )
+from generator.validate import validate_annotations
 
 
 SPEC_PATH = os.path.join(os.path.dirname(__file__), '..', 'config', 'board_spec.json')
@@ -513,3 +514,75 @@ class TestEdgeCases:
         comp = {"id": "X", "type": "led", "pins": {"anode": ["a", 10]}}
         x1, y1, x2, y2 = bbox_gen.component_bbox(comp)
         assert x2 > x1 and y2 > y1
+
+
+# ── validate_annotations ────────────────────────────────────────────────
+
+
+class TestValidateAnnotations:
+    def test_clean_annotations_pass(self, bbox_gen, grid, simple_led):
+        anns = bbox_gen.generate_annotations(simple_led)
+        errors = validate_annotations(
+            anns, simple_led, (bbox_gen.image_w, bbox_gen.image_h), grid=grid,
+        )
+        assert errors == []
+
+    def test_missing_component_annotation(self, bbox_gen, grid, simple_led):
+        anns = bbox_gen.generate_annotations(simple_led)
+        # Drop R1's annotation
+        anns = [a for a in anns if a.get('component_id') != 'R1']
+        errors = validate_annotations(
+            anns, simple_led, (bbox_gen.image_w, bbox_gen.image_h), grid=grid,
+        )
+        assert any("R1" in e and "no bounding box" in e for e in errors)
+
+    def test_missing_wire_annotation(self, bbox_gen, grid, simple_led):
+        anns = bbox_gen.generate_annotations(simple_led)
+        anns = [a for a in anns if a.get('wire_index') != 0]
+        errors = validate_annotations(
+            anns, simple_led, (bbox_gen.image_w, bbox_gen.image_h), grid=grid,
+        )
+        assert any("Wire index 0" in e for e in errors)
+
+    def test_zero_area_bbox_flagged(self, bbox_gen, grid, simple_led):
+        anns = bbox_gen.generate_annotations(simple_led)
+        anns[1]['bbox'] = (10, 10, 10, 10)  # zero area
+        errors = validate_annotations(
+            anns, simple_led, (bbox_gen.image_w, bbox_gen.image_h), grid=grid,
+        )
+        assert any("zero or negative area" in e for e in errors)
+
+    def test_negative_area_bbox_flagged(self, bbox_gen, grid, simple_led):
+        anns = bbox_gen.generate_annotations(simple_led)
+        anns[1]['bbox'] = (50, 50, 30, 30)  # negative area
+        errors = validate_annotations(
+            anns, simple_led, (bbox_gen.image_w, bbox_gen.image_h), grid=grid,
+        )
+        assert any("zero or negative area" in e for e in errors)
+
+    def test_bbox_outside_image_flagged(self, bbox_gen, grid, simple_led):
+        anns = bbox_gen.generate_annotations(simple_led)
+        anns[1]['bbox'] = (-10, -10, 50, 50)
+        errors = validate_annotations(
+            anns, simple_led, (bbox_gen.image_w, bbox_gen.image_h), grid=grid,
+        )
+        assert any("outside image bounds" in e for e in errors)
+
+    def test_pin_outside_bbox_flagged(self, bbox_gen, grid, simple_led):
+        anns = bbox_gen.generate_annotations(simple_led)
+        # Move R1's bbox far away from its pins
+        for a in anns:
+            if a.get('component_id') == 'R1':
+                a['bbox'] = (500, 100, 550, 150)
+        errors = validate_annotations(
+            anns, simple_led, (bbox_gen.image_w, bbox_gen.image_h), grid=grid,
+        )
+        assert any("outside bbox" in e for e in errors)
+
+    def test_works_without_grid(self, bbox_gen, simple_led):
+        # Skips pin-coverage check when grid is None
+        anns = bbox_gen.generate_annotations(simple_led)
+        errors = validate_annotations(
+            anns, simple_led, (bbox_gen.image_w, bbox_gen.image_h), grid=None,
+        )
+        assert errors == []
