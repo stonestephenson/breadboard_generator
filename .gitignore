@@ -6,3 +6,14 @@ output/images/
 output/dataset_*/
 *.egg-info/
 .DS_Store
+
+# CycleGAN data — raw photos (large, not regenerable, kept locally)
+data/real/*.HEIC
+data/real/*.heic
+data/real/*.jpg
+data/real/*.jpeg
+# CycleGAN data — prepared splits (regenerable via data/prepare_data.py)
+data/real/train/
+data/real/test/
+data/synthetic/
+data/prep_stats.json
