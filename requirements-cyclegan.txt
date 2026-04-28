@@ -1,0 +1,29 @@
+# GPU-only dependencies for Phase 8 (CycleGAN style transfer).
+# Install on the GPU host (e.g. NRP) — not needed for local dataset generation.
+#
+#   pip install -r requirements-cyclegan.txt
+#
+# torch / torchvision wheels: pick the CUDA build that matches the host driver.
+# The pinned versions below assume CUDA 12.1; for a different toolkit, install
+# the matching wheels via the index URL printed by https://pytorch.org/get-started/
+# before running this file (e.g. `pip install torch==2.3.1+cu118 ...`).
+
+torch>=2.3.0
+torchvision>=0.18.0
+
+# CycleGAN reference implementation dependencies.
+dominate>=2.9.0
+visdom>=0.2.4
+
+# Image / array tooling (also pulled in by main requirements, repeated for
+# self-contained GPU installs).
+numpy>=1.24.0
+pillow>=10.0.0
+opencv-python>=4.8.0
+
+# Validation metrics for Phase 8d (SSIM, etc.).
+scikit-image>=0.22.0
+
+# Progress / logging.
+tqdm>=4.66.0
+tensorboard>=2.16.0
