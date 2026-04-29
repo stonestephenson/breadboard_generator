@@ -108,6 +108,29 @@
       "yellow": [255, 220, 30],
       "blue":   [30, 80, 255],
       "white":  [255, 255, 240]
+    },
+
+    "arduino": {
+      "_note": "Arduino/Metro Mini microcontroller board straddling the center gap.",
+      "default_n_pins": 17,
+      "default_top_row": "c",
+      "default_bottom_row": "h",
+      "_row_note": "Pins at rows c and h give 0.7\" spacing — matches Adafruit Metro Mini.",
+      "body_color": [22, 32, 60],
+      "body_padding_long_mm": 1.5,
+      "body_padding_short_mm": 0.6,
+      "body_corner_radius_mm": 1.0,
+      "header_strip_color": [28, 28, 28],
+      "header_strip_width_mm": 2.4,
+      "pin_pad_color": [205, 175, 95],
+      "pin_pad_size_mm": 1.4,
+      "usb_color": [185, 185, 188],
+      "usb_outline_color": [110, 110, 110],
+      "usb_width_mm": 9.0,
+      "usb_length_mm": 7.5,
+      "usb_protrusion_mm": 2.0,
+      "silkscreen_color": [225, 225, 215],
+      "silkscreen_text": "METRO MINI"
     }
   }
 }
