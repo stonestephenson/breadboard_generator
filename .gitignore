@@ -15,5 +15,6 @@ data/real/*.jpeg
 # CycleGAN data — prepared splits (regenerable via data/prepare_data.py)
 data/real/train/
 data/real/test/
+data/real_cropped/
 data/synthetic/
 data/prep_stats.json

@@ -47,6 +47,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SUPPORTED_EXTS = {'.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp',
                   '.heic', '.heif'}
 
+# Triage buckets — a cropped output's bbox aspect (long/short) determines
+# whether it lands in good/ or needs_review/. Range chosen so the WB-102's
+# true 3.06:1 sits comfortably inside, with margin for slight angle/skew.
+TRIAGE_ASPECT_RANGE = (1.6, 3.5)
+
 # Reject detections whose bounding box covers less than this fraction
 # of the image — those are almost certainly not the breadboard
 # (a stray label, a glare highlight, etc.).
@@ -157,39 +162,66 @@ def load_image_bgr(path: Path) -> np.ndarray | None:
     return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
 
+def _triage_bucket(image_w: int, image_h: int) -> str:
+    """Return 'good' or 'needs_review' based on the output aspect ratio."""
+    long_side = max(image_w, image_h)
+    short_side = max(1, min(image_w, image_h))
+    aspect = long_side / short_side
+    if TRIAGE_ASPECT_RANGE[0] <= aspect <= TRIAGE_ASPECT_RANGE[1]:
+        return 'good'
+    return 'needs_review'
+
+
 def process_image(
-    src_path: Path, dst_path: Path, pad_fraction: float, dry_run: bool
-) -> str:
-    """Crop one image. Returns a status string for logging."""
+    src_path: Path,
+    output_dir: Path,
+    pad_fraction: float,
+    dry_run: bool,
+    triage: bool,
+) -> tuple[str, str | None]:
+    """
+    Crop one image. Returns (log_message, bucket) where bucket is
+    'good' / 'needs_review' / None (skipped).
+    """
     image = load_image_bgr(src_path)
     if image is None:
-        return f"SKIP (unreadable): {src_path.name}"
+        return f"SKIP (unreadable): {src_path.name}", None
 
     bbox = detect_breadboard_bbox(image)
     if bbox is None:
-        return f"SKIP (no breadboard found): {src_path.name}"
+        return f"SKIP (no breadboard found): {src_path.name}", None
 
     cropped = crop_with_padding(image, bbox, pad_fraction)
     cropped = to_landscape(cropped)
 
     in_h, in_w = image.shape[:2]
     out_h, out_w = cropped.shape[:2]
-    msg = (f"OK: {src_path.name}  {in_w}x{in_h} -> {out_w}x{out_h}  "
-           f"(bbox {bbox})")
+    bucket = _triage_bucket(out_w, out_h)
+
+    dst_dir = output_dir / bucket if triage else output_dir
+    dst_path = dst_dir / f"{src_path.stem}.png"
+
+    msg = (f"OK [{bucket}]: {src_path.name}  {in_w}x{in_h} -> "
+           f"{out_w}x{out_h}  (bbox {bbox})")
 
     if not dry_run:
         dst_path.parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(dst_path), cropped)
-    return msg
+    return msg, bucket
 
 
 def process_directory(
-    input_dir: Path, output_dir: Path, pad_fraction: float, dry_run: bool
+    input_dir: Path,
+    output_dir: Path,
+    pad_fraction: float,
+    dry_run: bool,
+    triage: bool,
 ) -> dict:
     """Process every supported image in input_dir."""
     if not input_dir.exists():
         print(f"  [skip] directory does not exist: {input_dir}")
-        return {"input_dir": str(input_dir), "processed": 0, "skipped": 0}
+        return {"input_dir": str(input_dir),
+                "good": 0, "needs_review": 0, "skipped": 0}
 
     files = sorted(
         p for p in input_dir.iterdir()
@@ -197,26 +229,26 @@ def process_directory(
     )
     if not files:
         print(f"  [skip] no images in {input_dir}")
-        return {"input_dir": str(input_dir), "processed": 0, "skipped": 0}
+        return {"input_dir": str(input_dir),
+                "good": 0, "needs_review": 0, "skipped": 0}
 
-    print(f"\nProcessing {len(files)} images in {input_dir} -> {output_dir}")
-    processed = skipped = 0
+    print(f"\nProcessing {len(files)} images in {input_dir} -> {output_dir}"
+          f"  (triage={'on' if triage else 'off'})")
+    counts = {'good': 0, 'needs_review': 0, 'skipped': 0}
     for src in files:
-        # Always write PNG — cv2.imwrite can't round-trip HEIC, and PNG
-        # is what prepare_data.py and the rest of the pipeline expect.
-        dst = output_dir / f"{src.stem}.png"
-        result = process_image(src, dst, pad_fraction, dry_run)
-        if result.startswith("OK"):
-            processed += 1
+        result, bucket = process_image(
+            src, output_dir, pad_fraction, dry_run, triage
+        )
+        if bucket is None:
+            counts['skipped'] += 1
         else:
-            skipped += 1
+            counts[bucket] += 1
         print(f"  {result}")
 
     return {
         "input_dir": str(input_dir),
         "output_dir": str(output_dir),
-        "processed": processed,
-        "skipped": skipped,
+        **counts,
     }
 
 
@@ -245,6 +277,12 @@ def main() -> int:
         '--dry-run', action='store_true',
         help="Detect and log only — do not write any files.",
     )
+    parser.add_argument(
+        '--triage', action=argparse.BooleanOptionalAction, default=True,
+        help=f"Sort outputs into good/ (aspect in {TRIAGE_ASPECT_RANGE}) and "
+             "needs_review/ (everything else) subdirs. Default: on. "
+             "Use --no-triage for a flat output dir.",
+    )
     args = parser.parse_args()
 
     input_dirs = args.input_dir or [PROJECT_ROOT / 'data' / 'real']
@@ -255,14 +293,20 @@ def main() -> int:
         print("WARNING: multiple --input-dirs share one --output-dir; "
               "duplicate filenames will overwrite.", file=sys.stderr)
 
-    totals = {"processed": 0, "skipped": 0}
+    totals = {"good": 0, "needs_review": 0, "skipped": 0}
     for in_dir in input_dirs:
-        stats = process_directory(in_dir, output_dir, args.padding, args.dry_run)
-        totals["processed"] += stats["processed"]
-        totals["skipped"] += stats["skipped"]
+        stats = process_directory(
+            in_dir, output_dir, args.padding, args.dry_run, args.triage,
+        )
+        for k in totals:
+            totals[k] += stats[k]
 
     print("\n" + "=" * 60)
-    print(f"Done. Processed: {totals['processed']}  Skipped: {totals['skipped']}")
+    print(f"Done. Good: {totals['good']}  Needs review: {totals['needs_review']}  "
+          f"Skipped: {totals['skipped']}")
+    if args.triage and not args.dry_run:
+        print(f"  → {output_dir}/good/  (clean crops, ready to use)")
+        print(f"  → {output_dir}/needs_review/  (hand-fix or discard)")
     if args.dry_run:
         print("(dry run — no files written)")
     print("=" * 60)
