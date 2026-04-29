@@ -52,35 +52,70 @@ SUPPORTED_EXTS = {'.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp',
 # (a stray label, a glare highlight, etc.).
 MIN_AREA_FRACTION = 0.05
 
+# WB-102 physical dimensions are 165.1mm x 54.0mm → ~3.06:1 in landscape.
+# Used by the bbox detector to score and filter contour candidates so a
+# white-on-white photo (white paper / white desk under the board) doesn't
+# get scored as one giant bright blob.
+TARGET_ASPECT = 165.1 / 54.0
+ASPECT_GATE = (1.8, 5.0)  # acceptable long/short ratio for a candidate bbox
+
 
 def detect_breadboard_bbox(image: np.ndarray) -> tuple[int, int, int, int] | None:
     """
     Return (x, y, w, h) of the breadboard's bounding box, or None if no
     plausible candidate is found.
+
+    Strategy: Canny edges + heavy dilation, then find external contours.
+    The breadboard's hole grid produces a very dense edge cluster that
+    survives even when the board sits on a white surface (where Otsu
+    thresholding fails because board and background are both bright).
+
+    Among contours, prefer those whose bounding-box aspect ratio falls
+    near the WB-102's true 3.06:1; pick the largest such candidate. If
+    nothing matches the aspect gate, fall back to the contour with the
+    best (area × aspect_match²) score.
     """
     h_img, w_img = image.shape[:2]
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    # Otsu thresholding picks a global cut-off between the bright board
-    # and the darker background automatically.
-    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    edges = cv2.Canny(blurred, 50, 150)
 
-    # Close small gaps from holes, labels, and component shadows so the
-    # board reads as a single connected region.
-    kernel_size = max(3, min(w_img, h_img) // 80)
+    # Dilate enough to merge the hole-pattern edges into one connected blob.
+    kernel_size = max(5, min(w_img, h_img) // 50)
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
-    closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+    dilated = cv2.dilate(edges, kernel, iterations=2)
 
-    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return None
 
-    largest = max(contours, key=cv2.contourArea)
-    x, y, w, h = cv2.boundingRect(largest)
+    img_area = w_img * h_img
+    candidates: list[tuple[int, int, int, int]] = []
+    fallback_score = 0.0
+    fallback_bbox: tuple[int, int, int, int] | None = None
 
-    if (w * h) / (w_img * h_img) < MIN_AREA_FRACTION:
-        return None
-    return x, y, w, h
+    for c in contours:
+        x, y, w, h = cv2.boundingRect(c)
+        bbox_area = w * h
+        if bbox_area / img_area < MIN_AREA_FRACTION:
+            continue
+
+        aspect = max(w, h) / max(1, min(w, h))
+        aspect_match = 1.0 / (1.0 + abs(aspect - TARGET_ASPECT))
+
+        score = (bbox_area / img_area) * (aspect_match ** 2)
+        if score > fallback_score:
+            fallback_score = score
+            fallback_bbox = (x, y, w, h)
+
+        if ASPECT_GATE[0] <= aspect <= ASPECT_GATE[1]:
+            candidates.append((x, y, w, h))
+
+    if candidates:
+        # Largest bbox among aspect-matching candidates wins.
+        return max(candidates, key=lambda b: b[2] * b[3])
+    return fallback_bbox
 
 
 def crop_with_padding(
