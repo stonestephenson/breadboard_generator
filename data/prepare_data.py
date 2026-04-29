@@ -107,13 +107,22 @@ def _render_circuit_downscaled(circuit_config: dict, spec: dict) -> Image.Image:
     return img
 
 
+# Fixed neutral grey used to pad the shorter axis when fitting a landscape
+# image into a square canvas. Both synthetic renders and real photos use
+# the same colour so the CycleGAN discriminator can't tell the domains
+# apart by their padding bars — corner-sampled colours used to vary
+# across real photos (desk / paper / sky) while staying constant in
+# synthetic, which subtly biased training.
+SQUARE_PAD_COLOR = (128, 128, 128)
+
+
 def _square_resize(img: Image.Image, size: int) -> Image.Image:
     """
     Resize to a square (size x size) without distorting aspect ratio.
 
-    Pads the shorter axis with the image's edge background colour so the
-    breadboard fits inside the square. CycleGAN trains on square crops,
-    and our boards are landscape, so direct resize would squash them.
+    Pads the shorter axis with SQUARE_PAD_COLOR (a fixed neutral grey)
+    so the breadboard fits inside the square without the pad colour
+    leaking domain information into the CycleGAN.
     """
     img = img.convert('RGB')
     w, h = img.size
@@ -122,10 +131,7 @@ def _square_resize(img: Image.Image, size: int) -> Image.Image:
     new_h = max(1, round(h * scale))
     resized = img.resize((new_w, new_h), Image.LANCZOS)
 
-    # Sample a corner pixel as the pad colour (board renders have a flat bg;
-    # real photos: just use a mid-grey, which CycleGAN will see as background).
-    pad_color = resized.getpixel((0, 0))
-    canvas = Image.new('RGB', (size, size), pad_color)
+    canvas = Image.new('RGB', (size, size), SQUARE_PAD_COLOR)
     canvas.paste(resized, ((size - new_w) // 2, (size - new_h) // 2))
     return canvas
 
