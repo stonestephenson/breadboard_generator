@@ -144,3 +144,37 @@ class TestLED:
         pixel = arr[my, mx]
         assert pixel[1] > pixel[0] and pixel[1] > pixel[2], \
             f"Expected green-dominant dome pixel, got {tuple(pixel[:3])}"
+
+    def test_led_blue(self):
+        """Blue LED should render with blue-dominant dome pixels."""
+        img, grid, _ = _make_board()
+        led = LED(anode=('a', 30), cathode=('b', 30), color='blue')
+        led.draw(img, grid)
+        arr = np.array(img)
+        ax, ay = grid.hole_center('a', 30)
+        cx, cy = grid.hole_center('b', 30)
+        mx, my = int(round((ax + cx) / 2)), int(round((ay + cy) / 2))
+        pixel = arr[my, mx]
+        assert pixel[2] > pixel[0] and pixel[2] > pixel[1], \
+            f"Expected blue-dominant dome pixel, got {tuple(pixel[:3])}"
+
+    def test_led_white(self):
+        """White LED should render with very bright, near-balanced dome pixels."""
+        img, grid, _ = _make_board()
+        led = LED(anode=('h', 35), cathode=('i', 35), color='white')
+        led.draw(img, grid)
+        arr = np.array(img)
+        ax, ay = grid.hole_center('h', 35)
+        cx, cy = grid.hole_center('i', 35)
+        mx, my = int(round((ax + cx) / 2)), int(round((ay + cy) / 2))
+        pixel = arr[my, mx]
+        # White dome: every channel should be very bright (>=220)
+        assert all(c >= 220 for c in pixel[:3]), \
+            f"Expected near-white dome pixel, got {tuple(pixel[:3])}"
+
+    def test_led_color_in_spec(self):
+        """Ensure board spec defines white and blue LED colors."""
+        spec = load_spec(SPEC_PATH)
+        led_colors = spec['component_defaults']['led_colors']
+        assert 'blue' in led_colors, "spec must define a 'blue' LED color"
+        assert 'white' in led_colors, "spec must define a 'white' LED color"
