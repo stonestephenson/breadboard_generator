@@ -15,6 +15,10 @@ from dataclasses import dataclass
 class CycleGANConfig:
     # --- Image / data ---
     image_size: int = 256             # Square crop side, in pixels.
+                                      # Override at the CLI with
+                                      # `python -m cyclegan.train --image-size 512`.
+                                      # Make sure prepare_data.py is run with the
+                                      # same --image-size so both domains match.
 
     # --- Optimisation ---
     batch_size: int = 1               # Standard for CycleGAN; instance-norm friendly.

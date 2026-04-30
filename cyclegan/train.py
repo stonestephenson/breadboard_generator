@@ -473,11 +473,22 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument('--num-workers', type=int, default=4)
     parser.add_argument('--seed', type=int, default=42)
 
-    # Optional overrides for the most common hyperparameters.
-    parser.add_argument('--epochs', type=int, default=None)
-    parser.add_argument('--batch-size', type=int, default=None)
-    parser.add_argument('--lr', type=float, default=None)
-    parser.add_argument('--image-size', type=int, default=None)
+    # Optional overrides for the most common hyperparameters. When omitted,
+    # the corresponding default from cyclegan.config.CONFIG is used.
+    parser.add_argument('--epochs', type=int, default=None,
+                        help="Override total epochs (default from config.py).")
+    parser.add_argument('--epochs-decay-start', type=int, default=None,
+                        help="Override epoch at which LR begins linear decay "
+                             "to zero (default from config.py).")
+    parser.add_argument('--batch-size', type=int, default=None,
+                        help="Override batch size (default from config.py).")
+    parser.add_argument('--lr', type=float, default=None,
+                        help="Override Adam learning rate.")
+    parser.add_argument('--image-size', type=int, default=None,
+                        help="Square training resolution in pixels. Overrides "
+                             "config.image_size (default 256). Pass 512 to "
+                             "train at 512x512 — make sure prepare_data.py "
+                             "was run with the same --image-size.")
 
     return parser.parse_args()
 
@@ -488,6 +499,7 @@ def main() -> None:
     cfg = CONFIG
     overrides: dict = {}
     if args.epochs is not None: overrides['epochs'] = args.epochs
+    if args.epochs_decay_start is not None: overrides['epochs_decay_start'] = args.epochs_decay_start
     if args.batch_size is not None: overrides['batch_size'] = args.batch_size
     if args.lr is not None: overrides['learning_rate'] = args.lr
     if args.image_size is not None: overrides['image_size'] = args.image_size
