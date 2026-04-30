@@ -27,8 +27,10 @@ class CycleGANConfig:
     beta2: float = 0.999              # Adam beta2 (paper default).
 
     # --- Schedule ---
-    epochs: int = 200                 # Total epochs.
-    epochs_decay_start: int = 100     # Epoch at which LR begins linear decay to 0.
+    epochs: int = 300                 # Total epochs.
+    epochs_decay_start: int = 150     # Epoch at which LR begins linear decay to 0.
+                                      # LR is held flat for the first half of
+                                      # training and then decays linearly to 0.
 
     # --- Loss weights ---
     lambda_cycle: float = 10.0        # Weight on cycle consistency loss.
