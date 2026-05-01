@@ -55,6 +55,9 @@ rm -rf cyclegan/checkpoints cyclegan/samples cyclegan/logs
 
 ## 4. Data Preparation
 
+Default run — 500-image diverse synthetic mix (50 blank / 100 wires-only /
+150 resistor+LED / 200 Arduino+extras), letterboxed to 256x256:
+
 ```bash
 python data/prepare_data.py \
     --real-source data/real \
@@ -62,9 +65,30 @@ python data/prepare_data.py \
     --stats-out data/prep_stats.json
 ```
 
+Train at 512x512 instead — synthetic and real **must** share the same
+`--image-size` as the train run:
+
+```bash
+python data/prepare_data.py \
+    --real-source data/real \
+    --image-size 512 \
+    --clean \
+    --stats-out data/prep_stats.json
+```
+
+Generate more synthetic images (per-category counts scale proportionally):
+
+```bash
+python data/prepare_data.py \
+    --real-source data/real \
+    --n-synthetic 1000 \
+    --clean \
+    --stats-out data/prep_stats.json
+```
+
 After running, sanity-check:
 ```bash
-cat data/prep_stats.json
+cat data/prep_stats.json                          # includes per-category mix
 ls data/real/train | wc -l
 ls data/real/test  | wc -l
 ls data/synthetic/train | wc -l
@@ -79,6 +103,28 @@ ls data/synthetic/train | wc -l
 nohup python -m cyclegan.train --batch-size 4 > train.log 2>&1 &
 echo $! > train.pid
 echo "Training PID: $(cat train.pid)"
+tail -f train.log
+```
+
+### Train at 512x512 (slower, sharper)
+The data must already be prepped at the same resolution — see Section 4.
+```bash
+nohup python -m cyclegan.train \
+    --image-size 512 \
+    --batch-size 1 \
+    > train.log 2>&1 &
+echo $! > train.pid
+tail -f train.log
+```
+
+### Custom epoch schedule (override config defaults)
+```bash
+nohup python -m cyclegan.train \
+    --batch-size 4 \
+    --epochs 400 \
+    --epochs-decay-start 200 \
+    > train.log 2>&1 &
+echo $! > train.pid
 tail -f train.log
 ```
 
@@ -157,13 +203,19 @@ rm -rf cyclegan/checkpoints cyclegan/samples cyclegan/logs
 # Pull latest code
 git pull origin main
 
-# Re-prep
+# Re-prep (default 256x256, 500 diverse synthetic images)
 python data/prepare_data.py --real-source data/real --clean --stats-out data/prep_stats.json
 
 # Re-train
 nohup python -m cyclegan.train --batch-size 4 > train.log 2>&1 &
 echo $! > train.pid
 tail -f train.log
+```
+
+For a 512x512 run, swap both lines:
+```bash
+python data/prepare_data.py --real-source data/real --image-size 512 --clean --stats-out data/prep_stats.json
+nohup python -m cyclegan.train --image-size 512 --batch-size 1 > train.log 2>&1 &
 ```
 
 ---
@@ -173,5 +225,7 @@ tail -f train.log
 - **Checkpoints save every 10 epochs** to `cyclegan/checkpoints/epoch_NNN.pth`.
 - **Sample translations save every 500 iterations** to `cyclegan/samples/`.
 - **CSV loss log appends** — old data stays unless you wipe `cyclegan/logs/`.
-- **Default training is 200 epochs** (~2 hours at batch_size 4 on A6000).
-- **LR decay starts at epoch 100** — losses should keep slowly improving but stabilize in second half.
+- **Default training is 300 epochs** (~3 hours at batch_size 4 on A6000 at 256x256).
+- **LR decay starts at epoch 150** — held flat for the first half, then linearly decays to 0 over the second half.
+- **Default synthetic mix is 500 images** (50/100/150/200 across blank, wires-only, resistor+LED, Arduino+extras). Override with `--n-synthetic`.
+- **Image size must match across both scripts** — `prepare_data.py --image-size 512` then `cyclegan.train --image-size 512`. Mismatched sizes will train at the config default and silently use the wrong-resolution data.
