@@ -106,18 +106,38 @@ echo "Training PID: $(cat train.pid)"
 tail -f train.log
 ```
 
-### Train at 512x512 (slower, sharper)
-The data must already be prepped at the same resolution — see Section 4.
+### Best-quality 512x512 — batch_size 1 (safe, standard CycleGAN recipe)
+512x512 + 400/200 epoch schedule is the maximum-quality recipe that's
+known to fit on an A6000. Data must already be prepped at 512x512 — see
+Section 4. Expect ~12-16 hours.
 ```bash
 nohup python -m cyclegan.train \
     --image-size 512 \
     --batch-size 1 \
+    --epochs 400 \
+    --epochs-decay-start 200 \
     > train.log 2>&1 &
 echo $! > train.pid
 tail -f train.log
 ```
 
-### Custom epoch schedule (override config defaults)
+### Best-quality 512x512 — batch_size 2 (try this first, may OOM)
+Same recipe with batch_size 2. Worth a shot on the A6000's 48GB; if it
+OOMs early, fall back to batch_size 1 above. CycleGAN uses InstanceNorm
+so larger batches don't sharpen gradients much — the only reason to try
+batch 2 is throughput.
+```bash
+nohup python -m cyclegan.train \
+    --image-size 512 \
+    --batch-size 2 \
+    --epochs 400 \
+    --epochs-decay-start 200 \
+    > train.log 2>&1 &
+echo $! > train.pid
+tail -f train.log
+```
+
+### Custom epoch schedule at 256x256 (override config defaults)
 ```bash
 nohup python -m cyclegan.train \
     --batch-size 4 \
@@ -128,12 +148,45 @@ echo $! > train.pid
 tail -f train.log
 ```
 
-### Resume from latest checkpoint
+### Resume from latest checkpoint (256x256 default)
 ```bash
 ls -lt cyclegan/checkpoints/                       # find the latest epoch_NNN.pth
 
 nohup python -m cyclegan.train \
     --batch-size 4 \
+    --resume cyclegan/checkpoints/epoch_NNN.pth \
+    > train.log 2>&1 &
+echo $! > train.pid
+tail -f train.log
+```
+
+### Resume the 512x512 best-quality run — batch_size 1
+The `--image-size`, `--epochs` and `--epochs-decay-start` flags must
+match the original run; the checkpoint stores model weights but not
+the resolution / schedule, so they're re-supplied on resume.
+```bash
+ls -lt cyclegan/checkpoints/
+
+nohup python -m cyclegan.train \
+    --image-size 512 \
+    --batch-size 1 \
+    --epochs 400 \
+    --epochs-decay-start 200 \
+    --resume cyclegan/checkpoints/epoch_NNN.pth \
+    > train.log 2>&1 &
+echo $! > train.pid
+tail -f train.log
+```
+
+### Resume the 512x512 best-quality run — batch_size 2
+```bash
+ls -lt cyclegan/checkpoints/
+
+nohup python -m cyclegan.train \
+    --image-size 512 \
+    --batch-size 2 \
+    --epochs 400 \
+    --epochs-decay-start 200 \
     --resume cyclegan/checkpoints/epoch_NNN.pth \
     > train.log 2>&1 &
 echo $! > train.pid
